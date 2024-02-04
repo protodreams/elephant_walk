@@ -123,14 +123,19 @@ resource "aws_security_group" "cloud_connect" {
 
 
 resource "aws_instance" "app_server" {
-  ami           = "ami-0277155c3f0ab2930"
-  instance_type = "t2.micro"
+  ami           = "ami-0e0a633d6a18a0e00"
+  instance_type = "g4dn.xlarge"
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
-  subnet_id     = data.aws_subnet.public1.id
-  associate_public_ip_address = true
+  subnet_id     = data.aws_subnet.private1.id
+  # associate_public_ip_address = true
   key_name = "roke-key"
   user_data = templatefile("${path.module}/init_script.tpl", {})
   vpc_security_group_ids = [aws_security_group.cloud_connect.id]
+
+  root_block_device {
+    volume_size = 100
+    volume_type = "gp3"
+  }
 
   tags = {
     Name = "CaptainsWalk"
