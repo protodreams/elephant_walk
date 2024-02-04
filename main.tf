@@ -35,7 +35,8 @@ module "vpc" {
   private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k)]
   public_subnets  = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 4)]
 
-  private_subnet_names = ["Private Subnet 1", "Private Subnet 2"]
+  private_subnet_names = ["Private Subnet 1", "Private Subnet 2", "Private Subnet 3"]
+  public_subnet_names = ["Public Subnet 1", "Putblic Subnet 2", "Public Subnet 3"]
 
   enable_dns_hostnames = true
   enable_dns_support   = true
@@ -62,6 +63,17 @@ data "aws_subnet" "private1" {
   ]
 }
 
+data "aws_subnet" "public1" {
+  filter {
+    name = "tag:Name"
+    values = ["Public Subnet 1"]
+  }
+
+  depends_on =  [
+    module.vpc 
+  ]
+}
+
 resource "aws_security_group" "cloud_connect" {
   name        = "cloud_connect"
   description = "Security Group for connecting prem to cloud"
@@ -81,12 +93,44 @@ resource "aws_security_group" "cloud_connect" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+  
+  resource "aws_iam_role" "ssm_role" {
+    name = "ssm_role"
+
+    assume_role_policy = jsonencode({
+      Version = "2012-10-17",
+      Statement = [
+        {
+          Action = "sts:AssumeRole",
+          Effect = "Allow",
+          Principal = {
+            Service = "ec2.amazonaws.com"
+          }
+        }
+      ]
+    })
+  }
+
+  resource "aws_iam_role_policy_attachment" "ssm_policy" {
+    policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    role       = aws_iam_role.ssm_role.name
+  }
+  
+  resource "aws_iam_instance_profile" "ssm_instance_profile" {
+    name = "ssm_instance_profile"
+    role = aws_iam_role.ssm_role.name
+  }
+
 
 resource "aws_instance" "app_server" {
   ami           = "ami-0277155c3f0ab2930"
   instance_type = "t2.micro"
-  subnet_id     = data.aws_subnet.private1.id
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
+  subnet_id     = data.aws_subnet.public1.id
+  associate_public_ip_address = true
   key_name = "roke-key"
+  user_data = templatefile("${path.module}/init_script.tpl", {})
+  vpc_security_group_ids = [aws_security_group.cloud_connect.id]
 
   tags = {
     Name = "CaptainsWalk"
