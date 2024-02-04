@@ -121,21 +121,39 @@ resource "aws_security_group" "cloud_connect" {
     role = aws_iam_role.ssm_role.name
   }
 
+resource "aws_ebs_volume" "Caves_of_Steel" {
+  availability_zone = data.aws_availability_zones.available.names[0]
+  size              = 190
+  type              = "gp3"
+  encrypted         = true
 
-resource "aws_instance" "app_server" {
-  ami           = "ami-0e0a633d6a18a0e00"
+  tags = {
+    Name = "Caves of Steel"
+  }
+}
+
+# resource "aws_volume_attachment" "dev-work" {
+#   device_name = "/dev/sdf"
+#   volume_id   = aws_ebs_volume.Caves_of_Steel.id
+#   instance_id = aws_instance.app_server.id
+# }
+
+
+resource "aws_spot_fleet_request" "dev-model-spot" {
+  iam_fleet_role = "arn:aws:iam::550834880252:role/aws-ec2-spot-fleet-tagging-role"
+  spot_price = "0.24"
+  target_capacity = 1
+  
+launch_specification {
+  ami   = "ami-0e0a633d6a18a0e00"
   instance_type = "g4dn.xlarge"
-  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
-  subnet_id     = data.aws_subnet.private1.id
-  # associate_public_ip_address = true
   key_name = "roke-key"
+  subnet_id  = data.aws_subnet.private1.id
+  availability_zone = data.aws_subnet.private1.availability_zone
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   user_data = templatefile("${path.module}/init_script.tpl", {})
   vpc_security_group_ids = [aws_security_group.cloud_connect.id]
-
-  root_block_device {
-    volume_size = 100
-    volume_type = "gp3"
-  }
+}
 
   tags = {
     Name = "CaptainsWalk"
