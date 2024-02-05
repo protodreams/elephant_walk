@@ -74,6 +74,12 @@ data "aws_subnet" "public1" {
   ]
 }
 
+resource "aws_network_interface" "dev-model-network-interface" { 
+  subnet_id = data.aws_subnet.public1.id
+  security_groups = [aws_security_group.cloud_connect.id]
+}
+
+
 resource "aws_security_group" "cloud_connect" {
   name        = "cloud_connect"
   description = "Security Group for connecting prem to cloud"
@@ -93,6 +99,17 @@ resource "aws_security_group" "cloud_connect" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
+# data "aws_security_group" "cloud_connect" {
+#   filter {
+#     name   = "tag:Name"
+#     values = ["cloud_connect"]
+#     }
+
+#     depends_on = [
+#       aws_instance.dev-model-instance
+#     ]
+# }
   
   resource "aws_iam_role" "ssm_role" {
     name = "ssm_role"
@@ -138,24 +155,42 @@ resource "aws_ebs_volume" "Caves_of_Steel" {
 #   instance_id = aws_instance.app_server.id
 # }
 
+resource "aws_launch_template" "dev-model-template" {
+  name = "dev-model-template"
+  image_id = "ami-0e0a633d6a18a0e00"
+  instance_type = "g4dn.xlarge"
+  key_name = "roke-key"
+  user_data = base64encode(templatefile("${path.module}/init_script.tpl", {}))
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ssm_instance_profile.name
+  }
+  network_interfaces {
+    device_index = 0
+    network_interface_id = aws_network_interface.dev-model-network-interface.id    
+  } 
+
+    tags = {
+    Name = "CaptainsWalk"
+  }
+}
+
+resource "aws_instance" "dev-model-instance" {
+
+  launch_template {
+    id = aws_launch_template.dev-model-template.id
+    version = "$Latest"
+  }
+}
 
 resource "aws_spot_fleet_request" "dev-model-spot" {
   iam_fleet_role = "arn:aws:iam::550834880252:role/aws-ec2-spot-fleet-tagging-role"
   spot_price = "0.24"
   target_capacity = 1
-  
-launch_specification {
-  ami   = "ami-0e0a633d6a18a0e00"
-  instance_type = "g4dn.xlarge"
-  key_name = "roke-key"
-  subnet_id  = data.aws_subnet.private1.id
-  availability_zone = data.aws_subnet.private1.availability_zone
-  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
-  user_data = templatefile("${path.module}/init_script.tpl", {})
-  vpc_security_group_ids = [aws_security_group.cloud_connect.id]
-}
 
-  tags = {
-    Name = "CaptainsWalk"
+  launch_template_config {
+    launch_template_specification {
+      id = aws_launch_template.dev-model-template.id
+      version = "$Latest"
+    }
   }
 }
