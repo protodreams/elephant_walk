@@ -12,6 +12,11 @@ provider "aws" {
   region = "us-east-1"
 }
 
+variable "environment" {
+  description = "The environment to deploy to"
+  type        = string
+  default     = "dev"
+}
 data "aws_availability_zones" "available" {}
 
 locals {
@@ -75,7 +80,7 @@ data "aws_subnet" "public1" {
 }
 
 resource "aws_network_interface" "dev-model-network-interface" { 
-  subnet_id = data.aws_subnet.public1.id
+  subnet_id = data.aws_subnet.private1.id
   security_groups = [aws_security_group.cloud_connect.id]
 }
 
@@ -100,17 +105,6 @@ resource "aws_security_group" "cloud_connect" {
   }
 }
 
-# data "aws_security_group" "cloud_connect" {
-#   filter {
-#     name   = "tag:Name"
-#     values = ["cloud_connect"]
-#     }
-
-#     depends_on = [
-#       aws_instance.dev-model-instance
-#     ]
-# }
-  
   resource "aws_iam_role" "ssm_role" {
     name = "ssm_role"
 
@@ -144,16 +138,20 @@ resource "aws_ebs_volume" "Caves_of_Steel" {
   type              = "gp3"
   encrypted         = true
 
+  lifecycle {
+    prevent_destroy = true
+  }
+
   tags = {
     Name = "Caves of Steel"
   }
 }
 
-# resource "aws_volume_attachment" "dev-work" {
-#   device_name = "/dev/sdf"
-#   volume_id   = aws_ebs_volume.Caves_of_Steel.id
-#   instance_id = aws_instance.app_server.id
-# }
+resource "aws_volume_attachment" "dev-work" {
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.Caves_of_Steel.id
+  instance_id = var.environment == "prod" ? aws_instance.dev-model-instance[0].id : data.aws_instances.dev-model-spot-instances.id  
+}
 
 resource "aws_launch_template" "dev-model-template" {
   name = "dev-model-template"
@@ -175,6 +173,8 @@ resource "aws_launch_template" "dev-model-template" {
 }
 
 resource "aws_instance" "dev-model-instance" {
+  ami = "ami-0e0a633d6a18a0e00"
+  count = var.environment == "prod" ? 1:0
 
   launch_template {
     id = aws_launch_template.dev-model-template.id
@@ -185,12 +185,24 @@ resource "aws_instance" "dev-model-instance" {
 resource "aws_spot_fleet_request" "dev-model-spot" {
   iam_fleet_role = "arn:aws:iam::550834880252:role/aws-ec2-spot-fleet-tagging-role"
   spot_price = "0.24"
-  target_capacity = 1
+  target_capacity =  var.environment == "dev" ? 1:0
+  count = var.environment == "dev" ? 1:0
 
-  launch_template_config {
-    launch_template_specification {
-      id = aws_launch_template.dev-model-template.id
-      version = "$Latest"
-    }
+   launch_template_config {
+      launch_template_specification {
+        id = aws_launch_template.dev-model-template.id
+        version = "$Latest"
+      }
+   }
+
+  tags = {
+    Name = "dev-model-spot"
   }
 }
+
+  data "aws_instances" "dev-model-spot-instances" {
+    instance_tags = {
+          spots = "dev-model-spot" 
+    }  
+  }
+      
