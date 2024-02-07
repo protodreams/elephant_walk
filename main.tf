@@ -132,21 +132,6 @@ resource "aws_security_group" "cloud_connect" {
     role = aws_iam_role.ssm_role.name
   }
 
-# resource "aws_ebs_volume" "Caves_of_Steel" {
-#   availability_zone = data.aws_availability_zones.available.names[0]
-#   size              = 190
-#   type              = "gp3"
-#   encrypted         = true
-
-#   lifecycle {
-#     prevent_destroy = false
-#   }
-
-#   tags = {
-#     Name = "Caves of Steel"
-#   }
-# }
-
 data "aws_ebs_volume" "Caves_of_Steel" {
   most_recent = true
   filter {
@@ -159,19 +144,21 @@ output "Caves_of_Steel" {
   value = data.aws_ebs_volume.Caves_of_Steel.id
 }
 
+resource "aws_volume_attachment" "dev-prod" {
+  device_name = "/dev/sdf"
+  volume_id   = data.aws_ebs_volume.Caves_of_Steel.id
+  instance_id =  aws_instance.dev-model-instance[0].id
+  count = var.environment == "prod" ? 1:0
+}
+
 resource "aws_volume_attachment" "dev-work" {
   device_name = "/dev/sdf"
   volume_id   = data.aws_ebs_volume.Caves_of_Steel.id
-  instance_id = var.environment == "prod" ? aws_instance.dev-model-instance[0].id : data.aws_instances.dev-model-spot-instances.id  
-}
+  instance_id = aws_spot_instance_request.dev-model-spot.spot_instance_id
 
-# data "aws_volume_attachment" "dev-work" {
-#   device_name = "/dev/sdf"
-#   instance_id = var.environment == "prod" ? aws_instance.dev-model-instance[0].id : data.aws_instances.dev-model-spot-instances.id
-# }
-
-output "dev-work" {
-   value = aws_volume_attachment.dev-work.instance_id
+  depends_on = [
+    aws_spot_instance_request.dev-model-spot
+  ]
 }
 
 resource "aws_launch_template" "dev-model-template" {
@@ -209,8 +196,9 @@ resource "aws_spot_instance_request" "dev-model-spot" {
   instance_type = "g4dn.xlarge"
   key_name = "roke-key"
   user_data = base64encode(templatefile("${path.module}/init_script.tpl", {}))
-  # iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.arn
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   subnet_id = data.aws_subnet.private1.id
+  security_groups = [aws_security_group.cloud_connect.id]
   wait_for_fulfillment = true
 
   tags = {
@@ -218,31 +206,25 @@ resource "aws_spot_instance_request" "dev-model-spot" {
   }
 }
 
-# resource "aws_spot_fleet_request" "dev-model-spot" {
-#   iam_fleet_role = "arn:aws:iam::550834880252:role/aws-ec2-spot-fleet-tagging-role"
-#   spot_price = "0.24"
-#   target_capacity =  var.environment == "dev" ? 1:0
-#   count = var.environment == "dev" ? 1:0
+resource "aws_network_interface" "dev-model-bastion-network-interface" { 
+  subnet_id = data.aws_subnet.public1.id
+  security_groups = [aws_security_group.cloud_connect.id]
+  
+}
 
-#    launch_template_config {
-#       launch_template_specification {
-#         id = aws_launch_template.dev-model-template.id
-#         version = "$Latest"
-#       }
-#    }
+resource "aws_instance" "dev-model-bastion" {
+  ami = "ami-0277155c3f0ab2930"
+  instance_type = "t2.micro"
+  key_name = "roke-key"
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
+  subnet_id = data.aws_subnet.public1.id
+  associate_public_ip_address = true
+  security_groups = [aws_security_group.cloud_connect.id]
 
-#   tags = {
-#     Name = "dev-model-spot"
-#   }
-# }
-
-  data "aws_instances" "dev-model-spot-instances" {
-    instance_tags = {
-          spots = "dev-model-spot" 
-    }  
+  tags = {
+    Name = "dev-model-bastion"
   }
+}
 
-  output "dev-model-spot-instances" {
-    value = data.aws_instances.dev-model-spot-instances.ids
-  }
+
       
