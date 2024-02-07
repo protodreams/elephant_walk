@@ -6,7 +6,7 @@ sudo systemctl start amazon-ssm-agent
 yum  update -y
 yum install -y util-linux e2fsprogs
 
-aws ec2 attach-volume --volume-id vol-031ef9d249e590f68 --instance-id $(curl http://169.254.169.254/latest/meta-data/instance-id) --device /dev/nvme2n1 --region us-east-1
+# aws ec2 attach-volume --volume-id vol-031ef9d249e590f68 --instance-id $(curl http://169.254.169.254/latest/meta-data/instance-id) --device /dev/nvme2n1 --region us-east-1
 # Wait for the volume to be attached
 while [ ! -e /dev/nvme2n1 ]; do sleep 1; done
 
@@ -31,6 +31,10 @@ chown ec2-user:ec2-user /mnt/caves_of_steel
 # Add an entry to /etc/fstab to mount the volume on reboot
 `echo "$caves_vol /mnt/caves_of_steel ext4 defaults,nofail 0 2" >> /etc/fstab`
               
+# install zsh
+sudo yum install -y zsh util-linux-user
+sudo chsh -s /usr/bin/zsh ec2-user
+sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
 
 # mkdir -p /mnt/caves_of_steel
 # mount  -t  ext4 /dev/nvme1n1 /mnt/caves_of_steel
