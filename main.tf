@@ -199,11 +199,13 @@ resource "aws_spot_instance_request" "dev-model-spot" {
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   subnet_id = data.aws_subnet.private1.id
   security_groups = [aws_security_group.cloud_connect.id]
-  wait_for_fulfillment = true
+    wait_for_fulfillment = true
+}
 
-  tags = {
-    Name = "dev-model-spot"
-  }
+resource "aws_ec2_tag" "dev-model-spot-tag" {
+  resource_id = aws_spot_instance_request.dev-model-spot.spot_instance_id
+  key = "Name"
+  value = "Waldo and Magic, Inc"
 }
 
 resource "aws_network_interface" "dev-model-bastion-network-interface" { 

@@ -36,6 +36,21 @@ sudo yum install -y zsh util-linux-user
 sudo chsh -s /usr/bin/zsh ec2-user
 sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
 
-# mkdir -p /mnt/caves_of_steel
-# mount  -t  ext4 /dev/nvme1n1 /mnt/caves_of_steel
+conda init zsh
+mamba init zsh
+echo -e "\nalias ll='ls -la'" >> ~/.zshrc
+source ~/.zshrc
+
+conda update -n base -c defaults conda -y
+mamba update -n base -c defaults mamba -y
+
+export TRANSFORMERS_CACHE=/mnt/caves_of_steel/.cache/torch/transformers
+export HF_HOME=/mnt/caves_of_steel/
+
+
+mamba create -n models -y pytorch torchvision torchaudio cudatoolkit=11.8 transformers -c pytorch
+conda activate models
+
+
+
               
