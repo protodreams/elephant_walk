@@ -154,7 +154,7 @@ resource "aws_volume_attachment" "dev-prod" {
 resource "aws_volume_attachment" "dev-work" {
   device_name = "/dev/sdf"
   volume_id   = data.aws_ebs_volume.Caves_of_Steel.id
-  instance_id = aws_spot_instance_request.dev-model-spot.spot_instance_id
+  instance_id = aws_spot_instance_request.dev-model-spot[0].spot_instance_id
 
   depends_on = [
     aws_spot_instance_request.dev-model-spot
@@ -199,11 +199,12 @@ resource "aws_spot_instance_request" "dev-model-spot" {
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   subnet_id = data.aws_subnet.private1.id
   security_groups = [aws_security_group.cloud_connect.id]
-    wait_for_fulfillment = true
+  count = var.environment == "prod" ? 0:1
+  wait_for_fulfillment = true
 }
 
 resource "aws_ec2_tag" "dev-model-spot-tag" {
-  resource_id = aws_spot_instance_request.dev-model-spot.spot_instance_id
+  resource_id = aws_spot_instance_request.dev-model-spot[0].spot_instance_id
   key = "Name"
   value = "Waldo and Magic, Inc"
 }
@@ -211,8 +212,7 @@ resource "aws_ec2_tag" "dev-model-spot-tag" {
 resource "aws_network_interface" "dev-model-bastion-network-interface" { 
   subnet_id = data.aws_subnet.public1.id
   security_groups = [aws_security_group.cloud_connect.id]
-  
-}
+  }
 
 resource "aws_instance" "dev-model-bastion" {
   ami = "ami-0277155c3f0ab2930"
