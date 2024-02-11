@@ -23,6 +23,9 @@ locals {
   name   = "dev-elephant-walk"
   region = "us-east-1"
 
+  # dl_ami = "ami-0e459aa446ca0e3ca"
+  dl_ami = "ami-029521d2fe94ab145"
+
   vpc_cidr = "10.0.0.0/16"
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 
@@ -163,10 +166,10 @@ resource "aws_volume_attachment" "dev-work" {
 
 resource "aws_launch_template" "dev-model-template" {
   name = "dev-model-template"
-  image_id = "ami-0e0a633d6a18a0e00"
+  image_id = local.dl_ami
   instance_type = "g4dn.xlarge"
   key_name = "roke-key"
-  user_data = base64encode(templatefile("${path.module}/init_script.tpl", {}))
+  # user_data = base64encode(templatefile("${path.module}/init_script.tpl", {}))
   iam_instance_profile {
     name = aws_iam_instance_profile.ssm_instance_profile.name
   }
@@ -181,7 +184,7 @@ resource "aws_launch_template" "dev-model-template" {
 }
 
 resource "aws_instance" "dev-model-instance" {
-  ami = "ami-0e0a633d6a18a0e00"
+  ami = local.dl_ami
   count = var.environment == "prod" ? 1:0
 
   launch_template {
@@ -192,10 +195,10 @@ resource "aws_instance" "dev-model-instance" {
 
 resource "aws_spot_instance_request" "dev-model-spot" {
   spot_price = "0.24"
-  ami = "ami-0e0a633d6a18a0e00"
+  ami = local.dl_ami
   instance_type = "g4dn.xlarge"
   key_name = "roke-key"
-  user_data = base64encode(templatefile("${path.module}/init_script.tpl", {}))
+  # user_data = base64encode(templatefile("${path.module}/init_script.tpl", {}))
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   subnet_id = data.aws_subnet.private1.id
   security_groups = [aws_security_group.cloud_connect.id]
